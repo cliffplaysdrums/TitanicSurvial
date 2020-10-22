@@ -1,6 +1,8 @@
 import pandas as pd
-from bokeh.plotting import figure, output_file, show
 import numpy as np
+from bokeh.plotting import figure, output_file, show
+import nn_model
+import torch
 
 np.random.seed(1)
 
@@ -39,7 +41,7 @@ def convert_embarked(emb):
 
 # PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
 TITANIC_DATA_CONVERTERS = {
-    # 4: convert_sex,
+    4: convert_sex,
     # 10: convert_cabin,
     11: convert_embarked
 }
@@ -70,11 +72,43 @@ def create_two_feature_plot(df, feat1, feat2, feat1_range=None, add_y_jitter=Fal
     show(p)
 
 
-def get_training_data():
-    return pd.read_csv('data/train.csv', converters=TITANIC_DATA_CONVERTERS)
+def get_training_data(convert=False):
+    if convert:
+        return pd.read_csv('data/train.csv', converters=TITANIC_DATA_CONVERTERS)
+    else:
+        return pd.read_csv('data/train.csv')
 
 
-df = get_training_data()
+def train_model(features, labels):
+    model = nn_model.TitanicPredictor(len(features[0]), 1)
+    loss_fn = torch.nn.MSELoss()
+    optimzer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+    EPOCHS = 1000
+    loss_list = []
+
+    for i in range(EPOCHS):
+        epoch_num = i + 1
+        predictions = model.forward(features)
+        loss = loss_fn(predictions, labels)
+        loss_list.append(loss)
+
+        if epoch_num % 25 == 0:
+            print(f'Epoch: {epoch_num} Loss: {loss}')
+
+        optimzer.zero_grad()
+        loss.backward()
+        optimzer.step()
+
+# df = get_training_data()
 # create_two_feature_plot(df, 'Sex', 'Age', feat1_range=['male', 'female'])
-create_two_feature_plot(df, 'Sex', 'Pclass', feat1_range=['male', 'female'], add_y_jitter=True)
+# create_two_feature_plot(df, 'Sex', 'Pclass', feat1_range=['male', 'female'], add_y_jitter=True)
+
+
+df = get_training_data(convert=True)
+features_for_training = ['Pclass', 'Sex', 'SibSp', 'Parch', 'Fare']
+train_features = torch.as_tensor(df[features_for_training].values.astype(np.float), dtype=torch.float)
+train_labels = torch.as_tensor(df['Survived'].values.astype(np.float), dtype=torch.float).unsqueeze(1)
+train_model(train_features, train_labels)
+
 
