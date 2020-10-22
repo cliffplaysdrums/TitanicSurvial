@@ -45,20 +45,28 @@ TITANIC_DATA_CONVERTERS = {
 }
 
 
-def create_two_feature_plot(df, feat1, feat2, feat1_range=None):
+def create_two_feature_plot(df, feat1, feat2, feat1_range=None, add_y_jitter=False):
     output_file(f'plots/{feat1}-{feat2}.html')
 
     survivor_indices = df['Survived'] == 1
     x_survivors = df.loc[survivor_indices, feat1].values
     x_casualties = df.loc[~survivor_indices, feat1].values
+    y_survivors = df.loc[survivor_indices, feat2].values
+    y_casualties = df.loc[~survivor_indices, feat2].values
+
     # Add some jitter so we don't have too many points overlapping and can see them all
+    dev = .05
     if feat1_range is not None:
-        x_survivors = list(zip(x_survivors, np.random.normal(scale=.05, size=len(x_survivors))))
-        x_casualties = list(zip(x_casualties, np.random.normal(scale=.05, size=len(x_casualties))))
+        x_survivors = list(zip(x_survivors, np.random.normal(scale=dev, size=len(x_survivors))))
+        x_casualties = list(zip(x_casualties, np.random.normal(scale=dev, size=len(x_casualties))))
+
+    if add_y_jitter:
+        y_survivors = y_survivors.astype(np.float) + np.random.normal(scale=dev, size=y_survivors.shape)
+        y_casualties = y_casualties.astype(np.float) + np.random.normal(scale=dev, size=y_casualties.shape)
 
     p = figure(title=f'Titanic Passenger Survival', x_range=feat1_range, x_axis_label=feat1, y_axis_label=feat2)
-    p.scatter(x_survivors, df.loc[survivor_indices][feat2], size=4, color='#3A5785', legend_label='Survivors')
-    p.scatter(x_casualties, df.loc[~survivor_indices][feat2], size=4, color='#B5A87A', legend_label='Casualties')
+    p.scatter(x_survivors, y_survivors, size=4, color='#3A5785', legend_label='Survivors')
+    p.scatter(x_casualties, y_casualties, size=4, alpha=.5, color='#B5A87A', legend_label='Casualties')
     show(p)
 
 
@@ -67,4 +75,6 @@ def get_training_data():
 
 
 df = get_training_data()
-create_two_feature_plot(df, 'Sex', 'Age', feat1_range=['male', 'female'])
+# create_two_feature_plot(df, 'Sex', 'Age', feat1_range=['male', 'female'])
+create_two_feature_plot(df, 'Sex', 'Pclass', feat1_range=['male', 'female'], add_y_jitter=True)
+
