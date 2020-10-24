@@ -48,6 +48,12 @@ TITANIC_DATA_CONVERTERS = {
     11: convert_embarked
 }
 
+TITANIC_TEST_DATA_CONVERTERS = {
+    3: convert_sex,
+    # 10: convert_cabin,
+    10: convert_embarked
+}
+
 
 def create_two_feature_plot(df, feat1, feat2, feat1_range=None, add_y_jitter=False):
     output_file(f'plots/{feat1}-{feat2}.html')
@@ -75,7 +81,7 @@ def create_two_feature_plot(df, feat1, feat2, feat1_range=None, add_y_jitter=Fal
 
 
 def get_test_data():
-    return pd.read_csv('data/test.csv', converters=TITANIC_DATA_CONVERTERS)
+    return pd.read_csv('data/test.csv', converters=TITANIC_TEST_DATA_CONVERTERS).fillna(value=0)
 
 
 def get_training_data(convert=False):
@@ -83,6 +89,22 @@ def get_training_data(convert=False):
         return pd.read_csv('data/train.csv', converters=TITANIC_DATA_CONVERTERS)
     else:
         return pd.read_csv('data/train.csv')
+
+
+def make_torch_predictions(model, features):
+    """
+
+    Args:
+        model (nn_model.TitanicPredictor):
+        features (np.ndarray):
+
+    Returns:
+        predictions (np.ndarray)
+    """
+    with torch.no_grad():
+        test_features = torch.as_tensor(features, dtype=torch.float)
+        predictions = model.forward(test_features).round().type(dtype=torch.int)
+        return predictions.numpy()
 
 
 def print_metrics(predictions, labels, model_name):
@@ -97,10 +119,10 @@ def print_metrics(predictions, labels, model_name):
 def train_model(features, labels):
     model = nn_model.TitanicPredictor(len(features[0]), 1)
     loss_fn = torch.nn.MSELoss()
-    optimzer = torch.optim.Adam(model.parameters(), lr=0.1)
-    scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .98)
+    optimzer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .98)
 
-    EPOCHS = 30000
+    EPOCHS = 1000
     loss_list = []
 
     for i in range(EPOCHS):
@@ -115,10 +137,10 @@ def train_model(features, labels):
         optimzer.zero_grad()
         loss.backward()
         optimzer.step()
-        if epoch_num % 100 == 0:
-            scheduler.step()
-            if epoch_num % 500 == 0:
-                print(f'\tlr is {scheduler.state_dict()["_last_lr"]}')
+        # if epoch_num % 100 == 0:
+        #     scheduler.step()
+        #     if epoch_num % 500 == 0:
+        #         print(f'\tlr is {scheduler.state_dict()["_last_lr"]}')
 
     return model
 
@@ -129,21 +151,34 @@ def train_model(features, labels):
 
 train_df = get_training_data(convert=True)
 features_for_training = ['Pclass', 'Sex', 'SibSp', 'Parch', 'Fare']
-train_features = torch.as_tensor(train_df[features_for_training].values.astype(np.float), dtype=torch.float)
+train_features_array = train_df[features_for_training].values.astype(np.float)
+train_features_tensor = torch.as_tensor(train_features_array, dtype=torch.float)
 train_labels = torch.as_tensor(train_df['Survived'].values.astype(np.float), dtype=torch.float).unsqueeze(1).detach()
 
-nn_model = train_model(train_features, train_labels)
-training_predictions = nn_model.forward(train_features.detach()).detach().round()
-print_metrics(predictions=training_predictions, labels=train_labels, model_name='Neural Network')
+# Train models & print metrics on training data
+# Neural net
+nn_model = train_model(train_features_tensor, train_labels)
+training_nn_predictions = make_torch_predictions(nn_model, train_features_array)
+print_metrics(predictions=training_nn_predictions, labels=train_labels, model_name='Neural Network')
+# Random forest
+forest_model = RandomForestClassifier(max_depth=None, n_estimators=100, random_state=1)
+forest_model.fit(train_features_array, train_df['Survived'].values)
+training_forest_predictions = forest_model.predict(train_features_array)
+print_metrics(predictions=training_forest_predictions, labels=train_labels, model_name='Random Forest')
 
-forest_model = RandomForestClassifier(max_depth=None, n_estimators=500, random_state=1)
-forest_model.fit(train_df[features_for_training].values, train_df['Survived'].values)
-training_predictions = forest_model.predict(train_df[features_for_training].values)
-print_metrics(predictions=training_predictions, labels=train_labels, model_name='Random Forest')
+# Generate predictions from neural net to submit
+test_df = get_test_data()
+test_features = test_df[features_for_training].values.astype(np.float)
+# predictions = make_torch_predictions(nn_model, test_features)
+# to_submit = pd.DataFrame(np.concatenate([test_df['PassengerId'].values.reshape((-1, 1)), predictions], axis=1),
+#                          columns=['PassengerId', 'Survived'])
+# to_submit.to_csv(path_or_buf='data/nn_submission.csv', index=False, header=True)
 
-# Generate predictions to submit
-# test_df = get_test_data()
-# test_features = torch.as_tensor(test_df[features_for_training].values.astype(np.float), dtype=torch.float)
-# predictions = model.forward(test_features)
+# Generate predictions from random forest to submit
+# predictions = forest_model.predict(test_features)
+# to_submit = pd.DataFrame(np.concatenate(
+#                             [test_df['PassengerId'].values.reshape((-1, 1)), predictions.reshape(-1, 1)], axis=1),
+#                          columns=['PassengerId', 'Survived'])
+# to_submit.to_csv(path_or_buf='data/forest_submission.csv', index=False, header=True)
 
 

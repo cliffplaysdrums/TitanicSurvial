@@ -5,7 +5,7 @@ class TitanicPredictor(nn.Module):
     def __init__(self, num_features, num_targets):
         super().__init__()
         self.fc1 = nn.Linear(in_features=num_features, out_features=num_features)
-        self.out = nn.Linear(in_features=num_features, out_features=1)
+        self.out = nn.Linear(in_features=num_features, out_features=num_targets)
 
     def forward(self, x):
         sig = nn.Sigmoid()
