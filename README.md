@@ -53,4 +53,5 @@ def train_model(features, labels):
 To appropriately evaluate our model's performance we'll need to hold out a portion of our training data for cross-validation, but we'll get there when we're ready for hyperparameter tuning. For now, let's train these simple models and make a submission.
 
 On the training data, our neural network achieved: 77.6% precision, 56.7% recall, and 77.1% accuracy. The random forest achieved 91.7% precision, 87.7% recall, and 92.3% accuracy. Our actual submissions using the testing dataset resulted in 70.8% accuracy (neural net) and 75.4% (forest). For comparison, I submitted the file provided by Kaggle which predicts that all women survive and all men do not. It achieved 76.6% accuracy which beat both of our models, so clearly we have work to do!
+
 ##Cross Validation
