@@ -5,6 +5,9 @@ import nn_model
 import torch
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, accuracy_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import FastICA, PCA
+from sklearn.preprocessing import PolynomialFeatures
 
 np.random.seed(1)
 
@@ -119,10 +122,10 @@ def print_metrics(predictions, labels, model_name):
 def train_model(features, labels):
     model = nn_model.TitanicPredictor(len(features[0]), 1)
     loss_fn = torch.nn.MSELoss()
-    optimzer = torch.optim.Adam(model.parameters(), lr=0.001)
-    # scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .98)
+    optimzer = torch.optim.Adam(model.parameters(), lr=0.005)
+    scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .9)
 
-    EPOCHS = 1000
+    EPOCHS = 2000
     loss_list = []
 
     for i in range(EPOCHS):
@@ -131,16 +134,14 @@ def train_model(features, labels):
         loss = loss_fn(predictions, labels)
         loss_list.append(loss)
 
-        if epoch_num % 100 == 0:
-            print(f'Epoch: {epoch_num} Loss: {loss}')
-
         optimzer.zero_grad()
         loss.backward()
         optimzer.step()
-        # if epoch_num % 100 == 0:
-        #     scheduler.step()
-        #     if epoch_num % 500 == 0:
-        #         print(f'\tlr is {scheduler.state_dict()["_last_lr"]}')
+
+        if epoch_num % 50 == 0:
+            scheduler.step()
+            if epoch_num % 100 == 0:
+                print(f'Epoch: {epoch_num}, Loss: {loss}, lr: {scheduler.state_dict()["_last_lr"][0]}')
 
     return model
 
@@ -152,19 +153,42 @@ def train_model(features, labels):
 train_df = get_training_data(convert=True)
 features_for_training = ['Pclass', 'Sex', 'SibSp', 'Parch', 'Fare']
 train_features_array = train_df[features_for_training].values.astype(np.float)
-train_features_tensor = torch.as_tensor(train_features_array, dtype=torch.float)
-train_labels = torch.as_tensor(train_df['Survived'].values.astype(np.float), dtype=torch.float).unsqueeze(1).detach()
+train_labels_array = train_df['Survived'].values.astype(np.float)
+
+train_features, cv_features, train_labels, cv_labels = train_test_split(train_features_array, train_labels_array,
+                                                                        train_size=.75, random_state=1)
+
+ica = FastICA(n_components=2, random_state=1)
+# pca = PCA(n_components=8, random_state=1)
+# poly = PolynomialFeatures(degree=3)
+train_features = np.concatenate([ica.fit_transform(train_features), train_features], axis=1)
+cv_features = np.concatenate([ica.fit_transform(cv_features), cv_features], axis=1)
+# train_features = poly.fit_transform(train_features)
+# cv_features = poly.fit_transform(cv_features)
+# train_features = pca.fit_transform(train_features)
+# cv_features = pca.fit_transform(cv_features)
+
+train_features_tensor = torch.as_tensor(train_features, dtype=torch.float)
+train_labels_tensor = torch.as_tensor(train_labels, dtype=torch.float).unsqueeze(1).detach()
+cv_features_tensor = torch.as_tensor(cv_features, dtype=torch.float)
+cv_labels_tensor = torch.as_tensor(cv_labels, dtype=torch.float).unsqueeze(1).detach()
 
 # Train models & print metrics on training data
 # Neural net
-nn_model = train_model(train_features_tensor, train_labels)
-training_nn_predictions = make_torch_predictions(nn_model, train_features_array)
-print_metrics(predictions=training_nn_predictions, labels=train_labels, model_name='Neural Network')
+nn_model = train_model(train_features_tensor, train_labels_tensor)
+training_nn_predictions = make_torch_predictions(nn_model, train_features_tensor)
+print_metrics(predictions=training_nn_predictions, labels=train_labels_tensor,
+              model_name='Neural Network (training data)')
+cv_nn_predictions = make_torch_predictions(nn_model, cv_features_tensor)
+print_metrics(predictions=cv_nn_predictions, labels=cv_labels_tensor,
+              model_name='Neural Network (cross-validation data)')
 # Random forest
 forest_model = RandomForestClassifier(max_depth=None, n_estimators=100, random_state=1)
-forest_model.fit(train_features_array, train_df['Survived'].values)
-training_forest_predictions = forest_model.predict(train_features_array)
-print_metrics(predictions=training_forest_predictions, labels=train_labels, model_name='Random Forest')
+forest_model.fit(train_features, train_labels)
+training_forest_predictions = forest_model.predict(train_features)
+cv_forest_predictions = forest_model.predict(cv_features)
+print_metrics(predictions=training_forest_predictions, labels=train_labels, model_name='Random Forest (training data)')
+print_metrics(predictions=cv_forest_predictions, labels=cv_labels, model_name='Random Forest (cross-validation data)')
 
 # Generate predictions from neural net to submit
 test_df = get_test_data()
