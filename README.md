@@ -16,6 +16,8 @@ Next is a plot showing passengers' sex again but this time with the class of the
 
 Since there's visual correlation between survival and at least 2 attributes, let's go ahead and train a simple model and see how it performs. Since some of our features aren't easily converted to numbers (e.g. how does cabin 'C85' relate to cabin 'C23 C25 C27'?), and I want to start with a simple model, I'll select a subset of features to use for training. I initially chose ticket class, sex, age, count of siblings/spouse on board, count of parents/children on board, and ticket fare. However, it turns out we don't know the age of 177 passengers. Since data is somewhat limited for this exercise *and* we already saw that age doesn't have strong correlation, I'll omit it for now.
 
+[Back to the top](#titanic:-machine)
+
 ## Simple models
 For comparison, we'll train two models. For the 1<sup>st</sup>, we're using sklearn's implementation of a random forest classifier with mostly default parameters. For the 2<sup>nd</sup>, we'll build a simple neural network in PyTorch that takes the five features we're currently using, undergoes a linear transformation plus a non-linear activation (Sigmoid) to output five features to another layer that uses the same transformation & activation but outputs our prediction.
 ```python
