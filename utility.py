@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from bokeh.plotting import figure, output_file, show
 import nn_model
+from nn_model import train_model
 import torch
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, accuracy_score
 from sklearn.ensemble import RandomForestClassifier
@@ -117,33 +118,6 @@ def print_metrics(predictions, labels, model_name):
     accuracy = (performances[1][1] + performances[0][0]) / len(labels)
 
     print(f'{model_name}\n\tPrecision: {precision}, Recall: {recall}, Accuracy: {accuracy}')
-
-
-def train_model(features, labels):
-    model = nn_model.TitanicPredictor(len(features[0]), 1)
-    loss_fn = torch.nn.MSELoss()
-    optimzer = torch.optim.Adam(model.parameters(), lr=0.005)
-    scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .9)
-
-    EPOCHS = 2000
-    loss_list = []
-
-    for i in range(EPOCHS):
-        epoch_num = i + 1
-        predictions = model.forward(features)
-        loss = loss_fn(predictions, labels)
-        loss_list.append(loss)
-
-        optimzer.zero_grad()
-        loss.backward()
-        optimzer.step()
-
-        if epoch_num % 50 == 0:
-            scheduler.step()
-            if epoch_num % 100 == 0:
-                print(f'Epoch: {epoch_num}, Loss: {loss}, lr: {scheduler.state_dict()["_last_lr"][0]}')
-
-    return model
 
 # df = get_training_data()
 # create_two_feature_plot(df, 'Sex', 'Age', feat1_range=['male', 'female'])
