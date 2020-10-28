@@ -1,5 +1,8 @@
 # Titanic: Machine Learning from Disaster
 Below is an analysis of taking on Kaggle's [Titanic ML competition](https://www.kaggle.com/c/titanic/overview).
+- [Getting to know the data](##getting-to-know-the-data)
+- [Simple models](##simple-models)
+- [Cross validation](##cross-validation)
 ## Getting to know the data
 The provided training data contains 892 samples and 9 features other than the target label. Thus, according to the curse of dimensionality, we may need to perform some transformation of our feature space, but it’s not so large that I’ll commit any effort to that yet. Instead, I'll look for correlation between features and labels and just get a feel for the data in general. It's also important to note that of our 892 training samples, 342 are survivors and 549 are not, so there is some imbalance in the data but not so significant that I'm overly concerned at this point.
 
@@ -13,7 +16,7 @@ Next is a plot showing passengers' sex again but this time with the class of the
 
 Since there's visual correlation between survival and at least 2 attributes, let's go ahead and train a simple model and see how it performs. Since some of our features aren't easily converted to numbers (e.g. how does cabin 'C85' relate to cabin 'C23 C25 C27'?), and I want to start with a simple model, I'll select a subset of features to use for training. I initially chose ticket class, sex, age, count of siblings/spouse on board, count of parents/children on board, and ticket fare. However, it turns out we don't know the age of 177 passengers. Since data is somewhat limited for this exercise *and* we already saw that age doesn't have strong correlation, I'll omit it for now.
 
-## Simple Models
+## Simple models
 For comparison, we'll train two models. For the 1<sup>st</sup>, we're using sklearn's implementation of a random forest classifier with mostly default parameters. For the 2<sup>nd</sup>, we'll build a simple neural network in PyTorch that takes the five features we're currently using, undergoes a linear transformation plus a non-linear activation (Sigmoid) to output five features to another layer that uses the same transformation & activation but outputs our prediction.
 ```python
 import torch.nn as nn
@@ -54,7 +57,7 @@ To appropriately evaluate our model's performance we'll need to hold out a porti
 
 On the training data, our neural network achieved: 77.6% precision, 56.7% recall, and 77.1% accuracy. The random forest achieved 91.7% precision, 87.7% recall, and 92.3% accuracy. Our actual submissions using the testing dataset resulted in 70.8% accuracy (neural net) and 75.4% (forest). For comparison, I submitted the file provided by Kaggle which predicts that all women survive and all men do not. It achieved 76.6% accuracy which beat both of our models, so clearly we have work to do!
 
-## Cross Validation
+## Cross validation
 Before we can tune our model's hyperparameters or architecture or perform any feature engineering, we need a way to reliably evaluate our model's performance. Sure, we could keep submitting to Kaggle and see how we do, but this is time-consuming, and more importantly we normally want to generalize. If we use our performance on the test set to inform decisions we make about our model's parameters, then we've effectively tuned our model to that data and can no longer make a claim about how it will perform on new, unseen data in the future. Since this is a learning exercise, we'll carry this philosophy forward and use a cross-validation set to inform our decisions and let the test set be a true evaluation of our model's ability to generalize.
 
 I started by reserving 25% of the provided training data for cross-validation.
