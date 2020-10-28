@@ -54,4 +54,24 @@ To appropriately evaluate our model's performance we'll need to hold out a porti
 
 On the training data, our neural network achieved: 77.6% precision, 56.7% recall, and 77.1% accuracy. The random forest achieved 91.7% precision, 87.7% recall, and 92.3% accuracy. Our actual submissions using the testing dataset resulted in 70.8% accuracy (neural net) and 75.4% (forest). For comparison, I submitted the file provided by Kaggle which predicts that all women survive and all men do not. It achieved 76.6% accuracy which beat both of our models, so clearly we have work to do!
 
-##Cross Validation
+## Cross Validation
+Before we can tune our model's hyperparameters or architecture or perform any feature engineering, we need a way to reliably evaluate our model's performance. Sure, we could keep submitting to Kaggle and see how we do, but this is time-consuming, and more importantly we normally want to generalize. If we use our performance on the test set to inform decisions we make about our model's parameters, then we've effectively tuned our model to that data and can no longer make a claim about how it will perform on new, unseen data in the future. Since this is a learning exercise, we'll carry this philosophy forward and use a cross-validation set to inform our decisions and let the test set be a true evaluation of our model's ability to generalize.
+
+I started by reserving 25% of the provided training data for cross-validation.
+```python
+from sklearn.model_selection import train_test_split
+train_features, cv_features, train_labels, cv_labels = train_test_split(train_features_array, train_labels_array, train_size=.75, random_state=1)
+```
+I've also gone ahead and added a decay schedule to our learning rate, but this likely won't play much of a factor for now.
+```python
+optimzer = torch.optim.Adam(model.parameters(), lr=0.005)
+scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .9)
+# ... then in our training loop:
+if epoch_num % 50 == 0:
+    scheduler.step()
+```
+
+## Feature Engineering
+Coming soon! PCA and ICA!
+## True Pruning
+Coming soon! We'll identify & fix our over-fitting problem!
