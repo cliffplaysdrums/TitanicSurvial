@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, acc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import FastICA, PCA
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, MinMaxScaler
 
 np.random.seed(1)
 
@@ -84,15 +84,28 @@ def create_two_feature_plot(df, feat1, feat2, feat1_range=None, add_y_jitter=Fal
     show(p)
 
 
-def get_test_data():
-    return pd.read_csv('data/test.csv', converters=TITANIC_TEST_DATA_CONVERTERS).fillna(value=0)
+def get_test_data(normalize=None):
+    df = pd.read_csv('data/test.csv', converters=TITANIC_TEST_DATA_CONVERTERS).fillna(value=0)
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    if normalize is not None:
+        for col in normalize:
+            df[col] = scaler.fit_transform(df[col].values.reshape(-1, 1))
 
 
-def get_training_data(convert=False):
+def get_training_data(convert=False, normalize=None):
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    df = None
+
     if convert:
-        return pd.read_csv('data/train.csv', converters=TITANIC_DATA_CONVERTERS)
+        df = pd.read_csv('data/train.csv', converters=TITANIC_DATA_CONVERTERS)
     else:
-        return pd.read_csv('data/train.csv')
+        df = pd.read_csv('data/train.csv')
+
+    if normalize is not None:
+        for col in normalize:
+            df[col] = scaler.fit_transform(df[col].values.reshape(-1, 1))
+
+    return df
 
 
 def make_torch_predictions(model, features):
@@ -119,12 +132,54 @@ def print_metrics(predictions, labels, model_name):
 
     print(f'{model_name}\n\tPrecision: {precision}, Recall: {recall}, Accuracy: {accuracy}')
 
+
+def generate_forest_submission(train_features_array, train_labels_array, relevant_features):
+    # Feature engineering
+    ica = FastICA(n_components=2, random_state=1)
+    train_features = np.concatenate([train_features_array, ica.fit_transform(train_features_array)], axis=1)
+    # Same for test data
+    test_df = get_test_data()
+    test_features_array = test_df[relevant_features].values.astype(np.float)
+    test_features = np.concatenate([test_features_array, ica.fit_transform(test_features_array)], axis=1)
+
+    # Train model
+    forest_model = RandomForestClassifier(max_depth=None, n_estimators=200, random_state=1)
+    forest_model.fit(train_features, train_labels_array)
+
+    # Make predictions & save
+    predictions = forest_model.predict(test_features)
+    to_submit = pd.DataFrame(np.concatenate(
+        [test_df['PassengerId'].values.reshape((-1, 1)).astype(int), predictions.reshape(-1, 1)], axis=1).astype(int),
+        columns=['PassengerId', 'Survived'])
+    to_submit.to_csv(path_or_buf='data/forest_submission.csv', index=False, header=True)
+
+
+def generate_nn_submission(train_features_array, train_labels_array, relevant_features):
+    # Feature engineering
+    ica = FastICA(n_components=2, random_state=1)
+    train_features = np.concatenate([train_features_array, ica.fit_transform(train_features_array)], axis=1)
+    # Same for test data
+    test_df = get_test_data()
+    test_features_array = test_df[relevant_features].values.astype(np.float)
+    test_features = np.concatenate([test_features_array, ica.fit_transform(test_features_array)], axis=1)
+
+    # Convert to tensors & train
+    train_features_tensor = torch.as_tensor(train_features, dtype=torch.float)
+    train_labels_tensor = torch.as_tensor(train_labels_array, dtype=torch.float).unsqueeze(1).detach()
+    nn_model = train_model(train_features_tensor, train_labels_tensor)
+
+    # Make predictions & save
+    predictions = make_torch_predictions(nn_model, test_features)
+    to_submit = pd.DataFrame(np.concatenate([test_df['PassengerId'].values.reshape((-1, 1)), predictions], axis=1),
+                             columns=['PassengerId', 'Survived'])
+    to_submit.to_csv(path_or_buf='data/nn_submission.csv', index=False, header=True)
+
+
 # df = get_training_data()
 # create_two_feature_plot(df, 'Sex', 'Age', feat1_range=['male', 'female'])
 # create_two_feature_plot(df, 'Sex', 'Pclass', feat1_range=['male', 'female'], add_y_jitter=True)
 
-
-train_df = get_training_data(convert=True)
+train_df = get_training_data(convert=True, normalize=['Age', 'SibSp', 'Fare'])
 features_for_training = ['Pclass', 'Sex', 'SibSp', 'Parch', 'Fare']
 train_features_array = train_df[features_for_training].values.astype(np.float)
 train_labels_array = train_df['Survived'].values.astype(np.float)
@@ -135,13 +190,14 @@ train_features, cv_features, train_labels, cv_labels = train_test_split(train_fe
 ica = FastICA(n_components=2, random_state=1)
 # pca = PCA(n_components=8, random_state=1)
 # poly = PolynomialFeatures(degree=3)
-train_features = np.concatenate([ica.fit_transform(train_features), train_features], axis=1)
-cv_features = np.concatenate([ica.fit_transform(cv_features), cv_features], axis=1)
+train_features = np.concatenate([train_features, ica.fit_transform(train_features)], axis=1)
+cv_features = np.concatenate([cv_features, ica.fit_transform(cv_features)], axis=1)
 # train_features = poly.fit_transform(train_features)
 # cv_features = poly.fit_transform(cv_features)
 # train_features = pca.fit_transform(train_features)
 # cv_features = pca.fit_transform(cv_features)
 
+# Create torch tensors to be used with NN
 train_features_tensor = torch.as_tensor(train_features, dtype=torch.float)
 train_labels_tensor = torch.as_tensor(train_labels, dtype=torch.float).unsqueeze(1).detach()
 cv_features_tensor = torch.as_tensor(cv_features, dtype=torch.float)
@@ -157,26 +213,16 @@ cv_nn_predictions = make_torch_predictions(nn_model, cv_features_tensor)
 print_metrics(predictions=cv_nn_predictions, labels=cv_labels_tensor,
               model_name='Neural Network (cross-validation data)')
 # Random forest
-forest_model = RandomForestClassifier(max_depth=None, n_estimators=100, random_state=1)
+forest_model = RandomForestClassifier(max_depth=None, n_estimators=200, random_state=1)
 forest_model.fit(train_features, train_labels)
 training_forest_predictions = forest_model.predict(train_features)
 cv_forest_predictions = forest_model.predict(cv_features)
 print_metrics(predictions=training_forest_predictions, labels=train_labels, model_name='Random Forest (training data)')
 print_metrics(predictions=cv_forest_predictions, labels=cv_labels, model_name='Random Forest (cross-validation data)')
 
-# Generate predictions from neural net to submit
-test_df = get_test_data()
-test_features = test_df[features_for_training].values.astype(np.float)
-# predictions = make_torch_predictions(nn_model, test_features)
-# to_submit = pd.DataFrame(np.concatenate([test_df['PassengerId'].values.reshape((-1, 1)), predictions], axis=1),
-#                          columns=['PassengerId', 'Survived'])
-# to_submit.to_csv(path_or_buf='data/nn_submission.csv', index=False, header=True)
+# Generate submissions
+# generate_nn_submission(train_features_array, train_labels_array, features_for_training)
+# generate_forest_submission(train_features_array, train_labels_array, features_for_training)
 
-# Generate predictions from random forest to submit
-# predictions = forest_model.predict(test_features)
-# to_submit = pd.DataFrame(np.concatenate(
-#                             [test_df['PassengerId'].values.reshape((-1, 1)), predictions.reshape(-1, 1)], axis=1),
-#                          columns=['PassengerId', 'Survived'])
-# to_submit.to_csv(path_or_buf='data/forest_submission.csv', index=False, header=True)
 
 
