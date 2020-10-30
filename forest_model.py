@@ -11,7 +11,7 @@ def search_forest_params(features, labels):
     # This left out portion can be used to estimate the generalization error without having to rely on a separate
     # validation set. This estimate comes “for free” as no additional data is needed and can be used for model
     # selection.
-    forest_model = RandomForestClassifier(max_depth=None, n_estimators=100, random_state=1)
+    forest_model = RandomForestClassifier(max_depth=None, random_state=1)
 
     # param_grid = [{'max_depth': list(range(1, 5)),
     #                'n_estimators': [2 ** i for i in range(4, 11)],

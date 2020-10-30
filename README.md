@@ -4,7 +4,7 @@ Below is an analysis of taking on Kaggle's [Titanic ML competition](https://www.
 - [Simple models](#simple-models)
 - [Cross validation](#cross-validation)
 ## Getting to know the data
-The provided training data contains 892 samples and 9 features other than the target label. Thus, according to the curse of dimensionality, we may need to perform some transformation of our feature space, but it’s not so large that I’ll commit any effort to that yet. Instead, I'll look for correlation between features and labels and just get a feel for the data in general. It's also important to note that of our 892 training samples, 342 are survivors and 549 are not, so there is some imbalance in the data but not so significant that I'm overly concerned at this point.
+The provided training data contains 892 samples and 9 features other than the target label. Thus, according to the [curse of dimensionality](https://en.wikipedia.org/wiki/Curse_of_dimensionality), we may need to perform some transformation of our feature space, but it’s not so large that I’ll commit any effort to that yet. Instead, I'll look for correlation between features and labels and just get a feel for the data in general. It's also important to note that of our 892 training samples, 342 are survivors and 549 are not, so there is some imbalance in the data but not so significant that I'm overly concerned at this point.
 
 Below is a plot showing passengers' sex and age and whether or not they survived. I've added random noise to the x-axis purely for visualization so that fewer points overlap. Clearly a higher percentage of women onboard survived than men, but there doesn't seem to be a strong correlation between age and survival.
 
@@ -73,10 +73,21 @@ scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda
 if epoch_num % 50 == 0:
     scheduler.step()
 ```
+## Feature transformation
+You will find some (commented out) code that runs [scikit-learn's implementations](https://scikit-learn.org/stable/modules/decomposition.html#pca) of principal components analysis and independent components analysis, but ultimately I wasn't getting any improvement from my neural network by reducing the feature dimensionality or by increasing for that matter (adding the projected features as new features or adding polynomial combinations). I may revisit this model to show some of the interesting code & math, but for now, let's see where we can get with our random forest and save a more complex network architecture for another problem.
+## Tuning our tree
+Recall that our forest achieved 92.3% on the training data but only 75.4% on the test data. This is an obvious sign that we're overfitting. One approach to addressing this is a hyperparameter search using cross-validation to inform parameter values. With this being a scikit-learn model, a lot of the code needed for this is built in.
+```python
+def search_forest_params(features, labels):
+    forest_model = RandomForestClassifier(max_depth=None, random_state=1)
 
-## Feature Engineering
-Coming soon! PCA and ICA!
-## True Pruning
-Coming soon! We'll identify & fix our over-fitting problem!
-
+    param_grid = [{'max_depth': list(range(1, 10)),
+                   'n_estimators': [2 ** i for i in range(4, 11)],
+                   'criterion': ['gini', 'entropy']}]
+    search = GridSearchCV(forest_model, param_grid=param_grid, cv=5, verbose=1, n_jobs=8)
+    search.fit(features, labels)
+    print(search.cv_results_)
+    print(search.best_estimator_)
+```
+The "tuned" random forest achieved 78.708% accuracy on the Kaggle leaderboard which is in the top 13% (higher if you count the 100% accurate models that "cheat" by looking at actual data of known survivors/casualties).
 [Back to the top](#titanic-machine-learning-from-disaster)
