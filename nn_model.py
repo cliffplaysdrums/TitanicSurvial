@@ -1,5 +1,6 @@
 import torch
 
+
 class TitanicPredictor(torch.nn.Module):
     def __init__(self, num_features, num_targets, pclass_encoder):
         super().__init__()
@@ -32,11 +33,13 @@ def train_model(orig_features, labels):
     pclass_encoder = Encoder(num_classes=3)
     model = TitanicPredictor(len(features[0]), 1, pclass_encoder)
     loss_fn = torch.nn.MSELoss()
-    optimzer = torch.optim.Adam(model.parameters(), lr=0.005)
-    encoder_optimizer = torch.optim.Adam(pclass_encoder.parameters(), lr=.0001)
-    scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .9)
+    optimzer = torch.optim.Adam(model.parameters(), lr=0.01)
+    encoder_optimizer = torch.optim.Adam(pclass_encoder.parameters(), lr=.01)
+    # scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda epoch: .9)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimzer, step_size=100, gamma=.8)
+    encoder_scheduler = torch.optim.lr_scheduler.StepLR(encoder_optimizer, step_size=100, gamma=.75)
 
-    EPOCHS = 2000
+    EPOCHS = 4000
     loss_list = []
 
     for i in range(EPOCHS):
@@ -51,9 +54,12 @@ def train_model(orig_features, labels):
         optimzer.step()
         encoder_optimizer.step()
 
+        scheduler.step()
+        encoder_scheduler.step()
         if epoch_num % 50 == 0:
-            scheduler.step()
+            # scheduler.step()
             if epoch_num % 100 == 0:
                 print(f'Epoch: {epoch_num}, Loss: {loss}, lr: {scheduler.state_dict()["_last_lr"][0]}')
 
     return model
+

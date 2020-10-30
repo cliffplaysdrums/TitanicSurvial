@@ -163,6 +163,32 @@ def make_torch_predictions(model, features):
         return predictions.numpy()
 
 
+def plot_projection(projected_features, labels, filename, plot_title):
+    """Creates a plot of a 2D array, color-coded according to labels. Intended to plot results of components analysis.
+
+    Args:
+        projected_features (np.ndarray): The values to be plotted. Has shape (n x 2).
+        labels (np.ndarray): The label of each sample. Must have shape (n,) or (n,1).
+        filename (str): The name to use when saving the file in the local 'plots' directory.
+        plot_title (str): The title to display on the plot.
+
+    Returns:
+        None
+    """
+    output_file(f'plots/{filename}.html')
+
+    survivor_indices = labels == 1
+    x_survivors = projected_features[survivor_indices, 0]
+    x_casualties = projected_features[~survivor_indices, 0]
+    y_survivors = projected_features[survivor_indices, 1]
+    y_casualties = projected_features[~survivor_indices, 1]
+
+    p = figure(title=plot_title)
+    p.scatter(x_survivors, y_survivors, size=4, color='#3A5785', legend_label='Survivors')
+    p.scatter(x_casualties, y_casualties, size=4, alpha=.5, color='#B5A87A', legend_label='Casualties')
+    show(p)
+
+
 def print_metrics(predictions, labels, model_name):
     performances = confusion_matrix(y_true=labels, y_pred=predictions)
     precision = performances[1][1] / (performances[1][1] + performances[0][1])
@@ -226,21 +252,38 @@ train_labels_array = train_df['Survived'].values.astype(np.float)
 train_features, cv_features, train_labels, cv_labels = train_test_split(train_features_array, train_labels_array,
                                                                         train_size=.75, random_state=1)
 
-ica = FastICA(n_components=2, random_state=1)
 # pca = PCA(n_components=8, random_state=1)
 # poly = PolynomialFeatures(degree=3)
-train_features = np.concatenate([train_features, ica.fit_transform(train_features)], axis=1)
-cv_features = np.concatenate([cv_features, ica.fit_transform(cv_features)], axis=1)
+
 # train_features = poly.fit_transform(train_features)
 # cv_features = poly.fit_transform(cv_features)
 # train_features = pca.fit_transform(train_features)
 # cv_features = pca.fit_transform(cv_features)
+
+# Uncomment to add features from ICA
+# n_components = 2
+# train_features_with_ica = engineer_features(train_features, num_new_features=n_components, algorithm='ica')
+# cv_features_with_ica = engineer_features(cv_features, num_new_features=n_components, algorithm='ica')
+# # plot_projection(train_features_with_ica[:, -n_components:], train_labels, filename=f'ica-{n_components}-components',
+# #                 plot_title='ICA of Titanic Passengers')
+# train_features = train_features_with_ica
+# cv_features = cv_features_with_ica
+
+# Uncomment to add features from PCA
+# n_components = 2
+# train_features_with_pca = engineer_features(train_features, num_new_features=n_components, algorithm='pca')
+# cv_features_with_pca = engineer_features(cv_features, num_new_features=n_components, algorithm='pca')
+# plot_projection(train_features_with_pca[:, -n_components:], train_labels, filename=f'pca-{n_components}-components',
+#                 plot_title='PCA of Titanic Passengers')
+# train_features = train_features_with_pca
+# cv_features = cv_features_with_pca
 
 # Create torch tensors to be used with NN
 train_features_tensor = torch.as_tensor(train_features, dtype=torch.float)
 train_labels_tensor = torch.as_tensor(train_labels, dtype=torch.float).unsqueeze(1).detach()
 cv_features_tensor = torch.as_tensor(cv_features, dtype=torch.float)
 cv_labels_tensor = torch.as_tensor(cv_labels, dtype=torch.float).unsqueeze(1).detach()
+
 
 # Train models & print metrics on training data
 # Neural net
