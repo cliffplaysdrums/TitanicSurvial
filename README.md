@@ -3,6 +3,7 @@ Below is an analysis of taking on Kaggle's [Titanic ML competition](https://www.
 - [Getting to know the data](#getting-to-know-the-data)
 - [Simple models](#simple-models)
 - [Cross validation](#cross-validation)
+- [One-hot encoding](#one-hot-encoding)
 - [Feature transformation](#feature-transformation)
 - [Tuning our tree](#tuning-our-tree)
 ## Getting to know the data
@@ -75,6 +76,36 @@ scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimzer, lr_lambda=lambda
 if epoch_num % 50 == 0:
     scheduler.step()
 ```
+## One-hot encoding
+One-hot encoding probably isn't necessary for this problem, but I wanted to illustrate the concept in PyTorch, and I could argue that ticket class doesn't have a known ordering as it pertains to survival. It could be that 3rd class was least likely to survive because some of the gates used to separate classes were accidentally left shut. It could be just as likely that 2nd class was least likely to survive because many in this class were contracted for work on the ship and were assisting with the evacuation.
+To add a one-hot encoded feature to my network, I created a helper class that itself is a miniature network:
+```python
+class Encoder(torch.nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.fc = torch.nn.Linear(in_features=num_classes, out_features=1)
+
+    def forward(self, x):
+        return self.fc(x.float())
+```
+I then modified my original network's forward function to assume that the first feature is to be one-hot encoded. `self.pclass_encoder` contains an instance of the `Encoder` class appropriate for this feature.
+```python
+def forward(self, x):
+    real_features = x[:, 1:]
+    encoded_features = torch.nn.functional.one_hot(x[:, 0].long() - 1)
+    sig = torch.nn.Sigmoid()
+    pclass_out = self.pclass_encoder.forward(encoded_features)
+    x = torch.cat((pclass_out, real_features), 1)
+    x = self.fc1(x)
+    x = sig(self.out(x))
+    return x
+```
+In my training loop, I create the encoder instance and pass it to my main network:
+```python
+pclass_encoder = Encoder(num_classes=3)  # 3 ticket classes
+model = TitanicPredictor(len(features[0]), 1, pclass_encoder)
+```
+I then added a separate optimizer for the encoder instance and stepped it inside the actual loop after calculating loss and stepping the main network's optimizer.
 ## Feature transformation
 You will find some (commented out) code that runs [scikit-learn's implementations](https://scikit-learn.org/stable/modules/decomposition.html#pca) of principal components analysis and independent components analysis, but ultimately I wasn't getting any improvement from my neural network by reducing the feature dimensionality or by increasing for that matter (adding the projected features as new features or adding polynomial combinations). I may revisit this model to show some of the interesting code & math, but for now, let's see where we can get with our random forest and save a more complex network architecture for another problem.
 ## Tuning our tree
