@@ -3,6 +3,8 @@ Below is an analysis of taking on Kaggle's [Titanic ML competition](https://www.
 - [Getting to know the data](#getting-to-know-the-data)
 - [Simple models](#simple-models)
 - [Cross validation](#cross-validation)
+- [Feature transformation](#feature-transformation)
+- [Tuning our tree](#tuning-our-tree)
 ## Getting to know the data
 The provided training data contains 892 samples and 9 features other than the target label. Thus, according to the [curse of dimensionality](https://en.wikipedia.org/wiki/Curse_of_dimensionality), we may need to perform some transformation of our feature space, but it’s not so large that I’ll commit any effort to that yet. Instead, I'll look for correlation between features and labels and just get a feel for the data in general. It's also important to note that of our 892 training samples, 342 are survivors and 549 are not, so there is some imbalance in the data but not so significant that I'm overly concerned at this point.
 
