@@ -88,7 +88,7 @@ class Encoder(torch.nn.Module):
     def forward(self, x):
         return self.fc(x.float())
 ```
-I then modified my original network's forward function to assume that the first feature is to be one-hot encoded. `self.pclass_encoder` contains an instance of the `Encoder` class appropriate for this feature.
+I then modified my original network's forward function to assume that the first feature is to be one-hot encoded. `self.pclass_encoder` contains an instance of the `Encoder` class appropriate for this feature. Note: the passenger class feature takes on values from 1 to 3, so I subtracted 1 from the whole vector. If we don't do this, our encoding will be 4 bits instead of 3 (one of which will always be 0).
 ```python
 def forward(self, x):
     real_features = x[:, 1:]
