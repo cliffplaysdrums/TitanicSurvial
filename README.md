@@ -105,7 +105,6 @@ In my training loop, I create the encoder instance and pass it to my main networ
 pclass_encoder = Encoder(num_classes=3)  # 3 ticket classes
 model = TitanicPredictor(len(features[0]), 1, pclass_encoder)
 ```
-I then added a separate optimizer for the encoder instance and stepped it inside the actual loop after calculating loss and stepping the main network's optimizer.
 ## Feature transformation
 You will find some (commented out) code that runs [scikit-learn's implementations](https://scikit-learn.org/stable/modules/decomposition.html#pca) of principal components analysis and independent components analysis, but ultimately I wasn't getting any improvement from my neural network by reducing the feature dimensionality or by increasing for that matter (adding the projected features as new features or adding polynomial combinations). I may revisit this model to show some of the interesting code & math, but for now, let's see where we can get with our random forest and save a more complex network architecture for another problem.
 ## Tuning our tree
